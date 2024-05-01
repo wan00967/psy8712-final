@@ -2,24 +2,26 @@
 setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
 library(haven) 
 library(tidyverse)
+library(caret)
 
 # Data Import and Cleaning
 gss_data <- read_sav("../data/General Social Survey, 2022.sav")
 
 gss_cleaned <- gss_data %>%
-  # Select necessary variables
-  select(WRKSTAT, AGE, EDUC, MARITAL, CHILDS, EQWLTH, HAPPY) %>%
-  # Remove rows with NA values in essential columns except WRKSTAT
-  filter(!is.na(AGE) & !is.na(EDUC) & !is.na(MARITAL) & !is.na(CHILDS) & !is.na(EQWLTH) & !is.na(HAPPY)) %>%
-  # Correctly defining the factor levels for WRKSTAT
-  mutate(WRKSTAT = factor(WRKSTAT, levels = c(1, 2, 3, 4, 5, 6, 7, 8),
-                          labels = c("Working full time", "Working part time", "With a job, but not at work",
-                                     "Unemployed, laid off", "Retired", "In school", "Keeping house", "Other")),
-         EDUC = factor(EDUC),
-         MARITAL = factor(MARITAL),
-         CHILDS = as.integer(CHILDS),  # Ensure CHILDS is an integer for analysis
-         EQWLTH = factor(EQWLTH, ordered = TRUE),
-         HAPPY = factor(HAPPY, ordered = TRUE))
+  select(WRKSTAT, AGE, EDUC, MARITAL, CHILDS, EQWLTH, HAPPY, INCOME) %>%
+  filter(!is.na(AGE) & !is.na(EDUC) & !is.na(MARITAL) & !is.na(CHILDS) & !is.na(EQWLTH) & !is.na(HAPPY)& !is.na(INCOME)) %>%
+  mutate(
+    WRKSTAT = factor(WRKSTAT, levels = c(1, 2, 4),
+                     labels = c("Working_full_time", "Working_part_time", "Unemployed_laid_off")),
+    EDUC = factor(EDUC),
+    MARITAL = factor(MARITAL),
+    CHILDS = as.integer(CHILDS),
+    EQWLTH = factor(EQWLTH, ordered = TRUE),
+    HAPPY = factor(HAPPY, ordered = TRUE),
+    INCOME = as.numeric(INCOME)
+  ) %>%
+  filter(WRKSTAT %in% c("Working_full_time", "Working_part_time", "Unemployed_laid_off"))
+
 
 
 gss_shiny <- gss_data %>%
@@ -47,3 +49,51 @@ gss_shiny <- gss_data %>%
 
 ## save data for shiny app
 saveRDS(gss_shiny, "../shiny/data.rds")
+
+# Analysis
+## RQ1: how well can individuals' income be predicted based on their age, education level, marital status, and number of children?
+set.seed(123)
+index <- createDataPartition(gss_cleaned$INCOME, p = 0.75, list = FALSE)
+gss_cleaned_train <- gss_cleaned[index,]
+gss_cleaned_test <- gss_cleaned[-index,]
+
+training_folds <- createFolds(gss_cleaned_train$INCOME, k = 10)
+
+reuseControl <- trainControl(
+  method = "cv",
+  number = 10,
+  search = "grid",
+  indexOut = training_folds,
+  verboseIter = TRUE,
+  savePredictions = "final"
+)
+
+mod_vec <- c("lm", "glmnet", "ranger", "xgbTree")  # Suitable for regression
+mod_ls <- list()
+
+for (i in seq_along(mod_vec)) {
+  method <- mod_vec[i]
+  pre_process <- if (method %in% c("lm", "glmnet")) {
+    c("center", "scale", "nzv", "medianImpute")
+  } else {
+    "medianImpute"
+  }
+  
+  mod <- train(INCOME ~ .,
+               data = gss_cleaned_train,
+               method = method,
+               metric = "RMSE",
+               trControl = reuseControl,
+               preProcess = pre_process)
+  mod_ls[[i]] <- mod
+}
+
+# Gathering results
+results <- resamples(mod_ls)
+summary(results)
+
+
+
+
+
+
