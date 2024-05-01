@@ -27,7 +27,7 @@ gss_cleaned <- gss_data %>%
 gss_shiny <- gss_data %>%
   select(HAPPY, DEGREE, SEX, WRKSLF, BORN, RACE, AGE, INCOME) %>%
   
-  # Convert labelled data to factors and handle missing values
+  # Convert labeled data to factors and handle missing values
   mutate(
     HAPPY = factor(HAPPY, levels = c(1, 2, 3), labels = c("Very Happy", "Pretty Happy", "Not Too Happy")),
     DEGREE = factor(DEGREE, levels = c(0, 1, 2, 3, 4), labels = c("Less than High School", "High School", "Associate/Junior College", "Bachelors", "Graduate")),
@@ -42,7 +42,7 @@ gss_shiny <- gss_data %>%
   # Filter out missing values in key variables, if necessary
   filter(!is.na(HAPPY) & !is.na(DEGREE) & !is.na(SEX) & !is.na(WRKSLF) & !is.na(BORN) & !is.na(RACE) & !is.na(AGE) & !is.na(INCOME)) %>%
   
-  # Optionally convert INCOME to a numeric variable if it's coded categorically
+  # convert INCOME to a numeric variable if it's coded categorically
   mutate(
     INCOME = as.numeric(as.character(INCOME)) # Make sure INCOME is appropriately coded if necessary
   )
@@ -88,12 +88,24 @@ for (i in seq_along(mod_vec)) {
   mod_ls[[i]] <- mod
 }
 
-# Gathering results
 results <- resamples(mod_ls)
 summary(results)
 
+## RQ2: is there a significant difference in how different educational levels perceive income inequality?
+### Ensuring `EQWLTH` is treated as a numeric for ANOVA
+gss_cleaned$EQWLTH_numeric <- as.numeric(gss_cleaned$EQWLTH)
 
+### ANOVA to compare EQWLTH across different levels of EDUC
+anova_result <- aov(EQWLTH_numeric ~ EDUC, data = gss_cleaned)
 
+### Output the ANOVA summary
+summary(anova_result)
 
+## RQ3: how does age correlate with income, and how does this correlation differ between males and females?
+correlations <- gss_shiny %>%
+  group_by(SEX) %>%
+  summarize(correlation = cor(AGE, INCOME, use = "complete.obs"))
+
+print(correlations)
 
 
