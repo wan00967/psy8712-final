@@ -1,0 +1,10 @@
+name: shiny
+title:
+username: wan00967
+account: wan00967
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 11907770
+bundleId: 8562145
+url: https://wan00967.shinyapps.io/shiny/
+version: 1
