@@ -88,8 +88,28 @@ for (i in seq_along(mod_vec)) {
   mod_ls[[i]] <- mod
 }
 
-results <- resamples(mod_ls)
-summary(results)
+# Function to extract model results and compute performance metrics
+results <- function(train_mod) {
+  algo <- train_mod$method
+  
+  # Extracting the best R-squared value from the training results
+  cv_rsq <- max(train_mod$results$Rsquared)
+  
+  # Predicting on the test set
+  preds <- predict(train_mod, gss_cleaned_test)
+  
+  # Computing the R-squared value on the holdout test set
+  ho_rsq <- cor(preds, gss_cleaned_test$INCOME)^2
+  
+  # Formatting the results
+  cv_rsq_formatted <- format(round(cv_rsq, 2), nsmall = 2)
+  ho_rsq_formatted <- format(round(ho_rsq, 2), nsmall = 2)
+  
+  return(c("algo" = algo, "cv_rsq" = cv_rsq_formatted, "ho_rsq" = ho_rsq_formatted))
+}
+
+# Applying the results function to each model and creating a summary table
+as_tibble(t(sapply(mod_ls, results)))
 
 ## RQ2: is there a significant difference in how different educational levels perceive income inequality?
 ### Ensuring `EQWLTH` is treated as a numeric for ANOVA
